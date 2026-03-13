@@ -1,5 +1,8 @@
 import os
 from flask import Flask, request, jsonify, send_file, abort
+from Config import TARGET_VERSION
+
+UPDATES_DIR = os.path.join(os.path.dirname(__file__), "updates")
 
 app = Flask(__name__)
 
@@ -30,8 +33,43 @@ def api_hello():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 400
 
+UPDATES_DIR = os.path.join(os.path.dirname(__file__), "updates")
 
-# 新增：客户端自动更新包下载接口
+
+@app.route("/api/update/check", methods=["POST"])
+def api_update_check():
+    """
+    第一步：检查是否需要更新
+    客户端 POST: {"version": "202603013-13:49"}
+    返回: {"need_update": true/false, "target_version": "202603131800"}
+    """
+    data = request.get_json(silent=True) or {}
+    client_version = data.get("version", "")
+
+    need_update = (client_version != TARGET_VERSION)
+    return jsonify({
+        "need_update": need_update,
+        "target_version": TARGET_VERSION
+    }), 200
+
+
+@app.route("/api/update/download", methods=["GET"])
+def api_update_download():
+    """
+    第二步：下载更新包
+    """
+    zip_path = os.path.join(UPDATES_DIR, TARGET_VERSION, "updated.zip")
+    if not os.path.isfile(zip_path):
+        return jsonify({"error": "Update package not found"}), 404
+
+    return send_file(
+        zip_path,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="update.zip"
+    )
+
+
 @app.route('/api/update', methods=['GET'])
 def api_update():
     file_path = os.path.join(UPDATE_DIR, UPDATE_FILENAME)
